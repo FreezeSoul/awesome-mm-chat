@@ -1,0 +1,204 @@
+export HF_ENDPOINT=https://hf-mirror.com
+cpu 上需要开 cpu 代理, worker 开 worker 代理
+
+
+dataloader 的 pre_fetch 默认是 2，表示每张卡预取 2*num_worker 个 batch 数据(pack 后)。如果是 8 张卡，那么就会是 2*num_worker*8 个，实际上是非常多的。
+dataloader 初始化时候啥也不干。一旦调用 iter(self._dataloader) 后开启多进程，然后开始 pre_fetch, 每个 worker pre_fetch 2 个 batch 的数据。
+pre_fetch 时候会在子进程通过batch sampler 获取一个 batch 的 index，发给 dataset+collator 得到一个 batch 数据，经过序列化放入到同一个 data_queue 中。
+一旦调用一次 next(dataloader) 则会触发主进程的 _try_get_data 方法从 _data_queue 中反序列化获取数据，返回给模型。
+
+以 8 卡，num_worker=8 为例，在 iter(self._dataloader) 后，默认就会攒 8*8*2=128 个 batch。如果是 256k 训练，那么这个内存是非常多的。
+
+
+qwen3.5 支持, pt28_all_env 原先是 4.57.1
+
+pip install transformers==5.2.0 flash-linear-attention -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn
+pip install /mnt/shared-storage-user/huanghaian/causal_conv1d-1.6.0+cu12torch2.8cxx11abiTRUE-cp312-cp312-linux_x86_64.whl  -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn
+
+# 如果 causal_conv1d 可以正常导入，则不需要下面的
+export LD_LIBRARY_PATH="/mnt/shared-storage-user/huanghaian/miniconda3/envs/verl/lib/python3.12/site-packages/torch/lib:$LD_LIBRARY_PATH"
+
+
+source /mnt/shared-storage-user/huanghaian/proxy_on
+~/.local/bin/huggingface-cli download --resume-download  Qwen/Qwen3-30B-A3B --local-dir Qwen3-30B-A3B
+
+# boto3
+pip install ../../petrel-oss-sdk-2.3.24.tar.gz  -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn --break-system-packages
+pip install transformers==4.57.0 -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn --break-system-packages
+pip install ray==2.52.0 -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn --break-system-packages
+pip install transformers==4.57.0 -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn --break-system-packages
+
+pip install wandb -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn --break-system-packages
+
+
+git clone https://github.com/sgl-project/sglang.git
+cd sglang
+git checkout 8ecf6b9d2480c3f600826c7d8fef6a16ed603c3f
+# Install the python packages
+pip install -e "python[all]" -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn --break-system-packages
+
+pip install sglang==0.5.3 -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn --break-system-packages
+拆卸掉 flashinfer-cubin
+
+
+pip install -e "python[all]" -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn
+
+python -m verl.model_merger merge --backend fsdp --local_dir /mnt/shared-storage-user/huanghaian/code/verl/DAPO/DAPO-Qwen2.5-7b-MATH-0527a1-200-step/global_step_100/actor/ --target_dir/mnt/shared-storage-user/huanghaian/code/verl/DAPO/DAPO-Qwen2.5-7b-MATH-0527a1-200-step/global_step_100/actor_hf
+
+export PYTHONPATH='/mnt/shared-storage-user/huanghaian/code/transformers/src'
+
+pip install openai_harmony mathruler pylatexenc codetiming xgrammar -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn --break-system-packages --target mathruler
+
+export PYTHONPATH="$(pwd):/mnt/shared-storage-user/huanghaian/code/temp/xtuner/mathruler" 
+
+bash examples/v1/scripts/run_rl.sh examples/v1/config/rl_qwen3_vl_8B_grpo.py "sglang" $MODEL_PATH $DATA_PATH $EVAL_DATA_PATH
+
+export PYTHONPATH="/mnt/shared-storage-user/huanghaian/code/temp/sglang/python/"
+
+import debugpy
+debugpy.connect(('10.102.151.17', 5680))
+
+ss -ltnp | grep -E ':5680\b' 查看 debugpy server 是否已经启动。
+
+pip install av -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn --break-system-packages
+
+export PATH=/usr/local/nvidia/bin/:$PATH
+export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:$LD_LIBRARY_PATH
+pip install -e "python" -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn --break-system-packages
+
+# 配置 nvcc
+export CUDA_HOME=/usr/local/cuda  
+export PATH="$CUDA_HOME/bin:$PATH"
+
+DISABLE_TURBOMIND=1 pip install -e . --no-deps -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn --break-system-packages
+
+/home/huanghaian/.local/bin/lmdeploy serve api_server /mnt/shared-storage-user/llmrazor-s
+hare/model/Qwen3-30B-A3B --server-port 5678  --enable-return-routed-experts
+
+export PYTHONPATH="/mnt/shared-storage-user/huanghaian/code/lmdeploy:$(pwd)"
+
+MAX_JOBS=32 pip install flash-attn --no-build-isolation -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn -v
+
+pip install rdkit==2025.3.6 -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn  --break-system-packages
+
+fa3
+cd hopper
+python setup.py install -v
+
+pip install ninja -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+
+lmdeploy 调试
+
+lmdeploy/pytorch/engine/executor/base.py 关闭 warmup   init 方法里面注释
+关闭 cuda graph : PytorchEngineConfig  eager_mode=True
+/mnt/shared-storage-user/huanghaian/code/lmdeploy_interns1_1/lmdeploy/lmdeploy/pytorch/strategies/base/model_inputs.py 固定 ep 情况下的 dump 数据
+
+
+git clone https://github.com/InternLM/GroupedGEMM.git
+git submodule update --init --recursive
+pip install -e .
+pip install -e . --no-build-isolatio # 高版本 pip
+
+
+source /mnt/shared-storage-user/llmit/user/lvchengqi/uv_venvs/xtuner_sglang/bin/activate
+export PYTHONPATH="$(pwd):/mnt/shared-storage-user/huanghaian/code/lmdeploy_interns1_1/lmdeploy/:/mnt/shared-storage-user/huanghaian/code/temp/xtuner/rl_debug_tools/"
+
+pre-commit run --files $(find xtuner/v1)
+
+ps axjf  | grep rl.py 打印树状结构
+
+cli_a92b81b62f7adceb
+BuySw4bQarETZotqiHm6gbj1wOXyeuSE
+
+
+Ctrl+Shift+K: 删除一行
+Shift + Alt + ↓: 复制当前到下一行
+
+
+export ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
+export ANTHROPIC_AUTH_TOKEN=sk-kimi-ZYwKC9voCB59lM5YWc0rk0g2b5j
+export ANTHROPIC_MODEL=kimi-for-coding
+export ANTHROPIC_DEFAULT_OPUS_MODEL=$ANTHROPIC_MODEL
+export ANTHROPIC_DEFAULT_SONNET_MODEL=$ANTHROPIC_MODEL
+export ANTHROPIC_DEFAULT_HAIKU_MODEL=$ANTHROPIC_MODEL
+claude_origin $@
+
+curl https://cip.cc
+curl https://ipinfo.io
+
+git config --global user.name "huanghaian" && git config --global user.email "huanghaian@pjlab.org.cn" && git config --list | grep user
+
+
+inters1-tokenizer 处理 1869.70 seconds 31
+qwen3.5-tokenizer 处理 1313.71 seconds 21
+慢了 (1870-1313)/1870=30%
+
+lmdeploy qwen3.5
+pip install tilelang -i http://mirrors.h.pjlab.org.cn/pypi/simple/ --trusted-host mirrors.h.pjlab.org.cn
+
+
+.git 忽略文件，写到如下文件，并且 .git/config 中增加 [core] excludesfile = .git/exclude 才能生效
+.git/exclude 
+
+安装 npm 到公共路径
+
+export HOME=/mnt/shared-storage-user/huanghaian
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+# 重新打开终端，或执行：
+source "$HOME/.nvm/nvm.sh"
+nvm install --lts
+node -v
+npm -v
+
+
+安装 codex
+PREFIX="$HOME/opt/codex-npm"
+mkdir -p "$PREFIX"
+npm install -g @openai/codex --prefix "$PREFIX"
+export PATH="$PREFIX/bin:$PATH"
+
+如果要更新，就
+export HOME=/mnt/shared-storage-user/huanghaian
+source "$HOME/.nvm/nvm.sh"
+nvm install --lts
+PREFIX="$HOME/opt/codex-npm"
+npm install -g @openai/codex --prefix "$PREFIX" 重新执行一遍
+export PATH="$PREFIX/bin:$PATH"
+
+
+
+curl http://10.103.23.20:4000/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen3.5",
+    "input": "who is Michael Jordan"
+  }'
+
+
+# gateway_url="http://35.220.164.252:3888"
+# api_key="sk-ihdmoRRhj5nSuGH8CRFDxIzS7vOg"
+# model_name="claude-sonnet-4-6"
+
+tmux kill-session -t terminus2
+
+
+纯文本+简单数据
+qwen3.5 35b   32k      10200tgs
+             64ksp2   9800tgs 
+
+
+256卡 qwen3.5 397b fp8 纯文本+简单数据
+1. ep1 + sp1 + 64k 序列长度的时候，通信计算可以 overlap，但是通信负载比较大，backward 阶段 reduce scatter 压力会比较大，tgs 还是会偏低一些（2600）
+2. ep4 + intralayer 2 大大降低了 allgather 和 reduce scatter 的通信开销，tgs 比较符合预期（2750），瓶颈感觉在 GDN，ep2 intralayer 2 可能是通信压力还是太大了，导致 backward 阶段的部分 reduce scatter 耗时仍然超过预期，这部分需要进一步研究（感觉理论上有潜力会更快？2650）
+3. 256k + ep1 + sp4 通信压力比较大，tgs 下降明显，backward 阶段 reduce scatter 偶发性很慢，tgs 较低（1800）。
+4. 256k + ep4 + sp8 通信压力骤减，tgs 仍然保持了比较高的水平（2500）
+5. 256k + ep1 + sp4 + MTP tgs 较低（1500，domino EP 暂时还不支持 MTP，没法测）且浮动较大，不确定和机器是否有关
+
+autore 相关benchmark 有过程分：
+posttrainbench
+paperbench
+mlebench
+openmle 开源框架解决 mle 问题
+
+

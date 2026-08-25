@@ -1,0 +1,31 @@
+HOST_IPS=$(hostname -I 2>/dev/null | tr ' ' ',' | sed 's/,$//')
+NO_PROXY_URL=${HOST_IPS},127.0.0.1,localhost,0.0.0.0,10.0.0.0/8,100.96.0.0/12,.pjlab.org.cn,.ailab-opencompass.svc,.ailab.ailab.ai,.ailab-evalservice.svc,.ailab-evalservice.pjh-service.org.cn
+
+if [ -f /usr/local/nvidia/lib64/libcuda.so ]; then
+  PROXY_URL=http://100.104.36.1:32888
+else
+  PROXY_URL=http://httpproxy-headless.kubebrain.svc.pjlab.local:3128
+fi
+
+PROXY_URL=http://100.104.36.1:32888
+
+proxy_on() {
+  export http_proxy=${PROXY_URL}
+  export https_proxy=${PROXY_URL}
+  export HTTP_PROXY=${PROXY_URL}
+  export HTTPS_PROXY=${PROXY_URL}
+  export NO_PROXY=${NO_PROXY_URL}
+  export no_proxy=${NO_PROXY_URL}
+}
+
+proxy_off() {
+  unset http_proxy
+  unset HTTP_PROXY
+  unset https_proxy
+  unset HTTPS_PROXY
+  unset NO_PROXY
+  unset no_proxy
+}
+
+# default proxy on
+proxy_on
